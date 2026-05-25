@@ -644,4 +644,176 @@
         // دالة التبديل لإظهار وإخفاء الملاحظة الإيمانية
         function toggleSpiritualNote() {
             const noteCard = document.getElementById('spiritual-note-card');
+            const toggleBtn = document.getElementById('btn-toggle-note');
             
+            if (noteCard.style.display === 'none' || noteCard.style.display === '') {
+                noteCard.style.display = 'block';
+                toggleBtn.innerHTML = '✕ إغلاق الملاحظة الإيمانية';
+            } else {
+                noteCard.style.display = 'none';
+                toggleBtn.innerHTML = '💡 ملاحظة إيمانية حول كيفية استجابة الدعاء';
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('my_arafa_duas_v2', JSON.stringify(myDuas));
+        }
+
+        function renderList() {
+            const listContainer = document.getElementById('personal-list');
+            listContainer.innerHTML = '';
+
+            if (myDuas.length === 0) {
+                listContainer.innerHTML = `
+                    <li style="text-align: center; color: var(--text-muted); padding: 30px; font-size: 0.95rem; border: 1.5px dashed #e2e8f0; border-radius: var(--radius-main);">
+                        لم تقم بإضافة أدعية بعد. ابدأ بكتابة دعائك الأول بالخانات أعلاه.
+                    </li>`;
+                return;
+            }
+
+            myDuas.forEach(dua => {
+                const li = document.createElement('li');
+                li.className = `personal-item ${dua.answered ? 'is-answered' : ''}`;
+                li.innerHTML = `
+                    <div class="checkbox-wrapper" 
+                         role="checkbox" 
+                         aria-checked="${dua.answered ? 'true' : 'false'}" 
+                         tabindex="0" 
+                         onclick="toggleAnswer(${dua.id})" 
+                         onkeydown="handleCheckboxKeyDown(event, ${dua.id})"
+                         aria-label="تحديد كدعاء مستجاب">
+                        <svg viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    
+                    <div class="item-body">
+                        <span class="personal-text">${escapeHtml(dua.text)}</span>
+                        
+                        <div class="item-footer">
+                            <span class="badge-success">مستجاب الحمد لله ✓</span>
+                            <button class="btn-delete" onclick="removeDua(${dua.id})">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                </svg>
+                                حذف الدعاء
+                            </button>
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(li);
+            });
+        }
+
+        function handleCheckboxKeyDown(e, id) {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                toggleAnswer(id);
+            }
+        }
+
+        function handleNewDua(e) {
+            e.preventDefault();
+            const input = document.getElementById('new-dua-input');
+            const text = input.value.trim();
+            if (text) {
+                myDuas.push({
+                    id: Date.now(),
+                    text: text,
+                    answered: false
+                });
+                saveData();
+                renderList();
+                input.value = '';
+                showToast("تم الحفظ في قائمتك الخاصة");
+            }
+        }
+
+        function addDuaFromPreset(text) {
+            if (myDuas.some(d => d.text === text)) {
+                showToast("هذا الدعاء محفوظ في قائمتك بالفعل");
+                return;
+            }
+            myDuas.push({
+                id: Date.now(),
+                text: text,
+                answered: false
+            });
+            saveData();
+            renderList();
+            showToast("تم الإضافة لقائمتك");
+        }
+
+        function toggleAnswer(id) {
+            myDuas = myDuas.map(d => {
+                if (d.id === id) {
+                    const nextState = !d.answered;
+                    if (nextState) {
+                        showToast("الحمد لله على كريم فضله واستجابته!");
+                    }
+                    return { ...d, answered: nextState };
+                }
+                return d;
+            });
+            saveData();
+            renderList();
+        }
+
+        function removeDua(id) {
+            myDuas = myDuas.filter(d => d.id !== id);
+            saveData();
+            renderList();
+            showToast("تم حذف الدعاء");
+        }
+
+        function copyText(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast("تم نسخ الدعاء إلى الحافظة!");
+                }).catch(() => {
+                    fallbackCopyText(text);
+                });
+            } else {
+                fallbackCopyText(text);
+            }
+        }
+
+        function fallbackCopyText(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; 
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast("تم نسخ الدعاء إلى الحافظة!");
+            } catch (err) {
+                showToast("عذراً، لم نتمكن من النسخ تلقائياً");
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast-message');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+    </script>
+</body>
+</html>
